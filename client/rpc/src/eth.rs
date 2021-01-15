@@ -46,6 +46,7 @@ use fc_rpc_core::types::{
 };
 use fp_rpc::{EthereumRuntimeRPCApi, ConvertTransaction, TransactionStatus};
 use fp_storage::PALLET_ETHEREUM_SCHEMA;
+use sc_transaction_graph::{ChainApi, Pool};
 use crate::{internal_err, error_on_execution_failure, EthSigner, public_key};
 use sp_storage::StorageKey;
 
@@ -54,8 +55,9 @@ use codec::{self, Encode, Decode};
 use pallet_ethereum::EthereumStorageSchema;
 use crate::overrides::{StorageOverride, RuntimeApiStorageOverride};
 
-pub struct EthApi<B: BlockT, C, P, CT, BE, H: ExHashT> {
+pub struct EthApi<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi> {
 	pool: Arc<P>,
+	graph: Arc<Pool<A>>,
 	client: Arc<C>,
 	convert_transaction: CT,
 	network: Arc<NetworkService<B, H>>,
@@ -68,7 +70,7 @@ pub struct EthApi<B: BlockT, C, P, CT, BE, H: ExHashT> {
 	_marker: PhantomData<(B, BE)>,
 }
 
-impl<B: BlockT, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
+impl<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi> EthApi<B, C, P, CT, BE, H, A> where
 	C: ProvideRuntimeApi<B>,
 	C::Api: EthereumRuntimeRPCApi<B>,
 	B: BlockT<Hash=H256> + Send + Sync + 'static,
@@ -77,6 +79,7 @@ impl<B: BlockT, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
 	pub fn new(
 		client: Arc<C>,
 		pool: Arc<P>,
+		graph: Arc<Pool<A>>,
 		convert_transaction: CT,
 		network: Arc<NetworkService<B, H>>,
 		pending_transactions: PendingTransactions,
@@ -88,6 +91,7 @@ impl<B: BlockT, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
 		Self {
 			client: client.clone(),
 			pool,
+			graph,
 			convert_transaction,
 			network,
 			is_authority,
@@ -293,8 +297,7 @@ fn blake2_128_extend(bytes: &[u8]) -> Vec<u8> {
 	ext
 }
 
-impl<B, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
-	B: BlockT,
+impl<B, C, P, CT, BE, H: ExHashT, A> EthApi<B, C, P, CT, BE, H, A> where
 	C: ProvideRuntimeApi<B> + StorageProvider<B, BE> + AuxStore,
 	C: HeaderBackend<B> + HeaderMetadata<B, Error=BlockChainError> + 'static,
 	C::Api: EthereumRuntimeRPCApi<B>,
@@ -303,6 +306,7 @@ impl<B, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
 	B: BlockT<Hash=H256> + Send + Sync + 'static,
 	C: Send + Sync + 'static,
 	P: TransactionPool<Block=B> + Send + Sync + 'static,
+	A: ChainApi<Block = B> + 'static,
 	CT: ConvertTransaction<<B as BlockT>::Extrinsic> + Send + Sync + 'static,
 {
 	fn native_block_id(&self, number: Option<BlockNumber>) -> Result<Option<BlockId<B>>> {
@@ -438,7 +442,7 @@ impl<B, C, P, CT, BE, H: ExHashT> EthApi<B, C, P, CT, BE, H> where
 	}
 }
 
-impl<B, C, P, CT, BE, H: ExHashT> EthApiT for EthApi<B, C, P, CT, BE, H> where
+impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> where
 	C: ProvideRuntimeApi<B> + StorageProvider<B, BE> + AuxStore,
 	C: HeaderBackend<B> + HeaderMetadata<B, Error=BlockChainError> + 'static,
 	C::Api: EthereumRuntimeRPCApi<B>,
@@ -447,6 +451,7 @@ impl<B, C, P, CT, BE, H: ExHashT> EthApiT for EthApi<B, C, P, CT, BE, H> where
 	B: BlockT<Hash=H256> + Send + Sync + 'static,
 	C: Send + Sync + 'static,
 	P: TransactionPool<Block=B> + Send + Sync + 'static,
+	A: ChainApi<Block = B> + 'static,
 	CT: ConvertTransaction<<B as BlockT>::Extrinsic> + Send + Sync + 'static,
 {
 	fn protocol_version(&self) -> Result<u64> {
@@ -767,33 +772,45 @@ impl<B, C, P, CT, BE, H: ExHashT> EthApiT for EthApi<B, C, P, CT, BE, H> where
 		);
 		let hash = self.client.info().best_hash;
 		let number = self.client.info().best_number;
-		let pending = self.pending_transactions.clone();
-		Box::new(
-			self.pool
-				.submit_one(
-					&BlockId::hash(hash),
-					TransactionSource::Local,
-					self.convert_transaction.convert_transaction(transaction.clone()),
+
+		let uxt = self
+			.convert_transaction
+			.convert_transaction(transaction.clone());
+		let (uxt_hash, _bytes) = self.graph.validated_pool().api().hash_and_length(&uxt);
+		let check_is_known = self.graph.validated_pool().check_is_known(&uxt_hash, false);
+
+		match check_is_known {
+			Ok(_) => {
+				let pending = self.pending_transactions.clone();
+				Box::new(
+					self.pool
+						.submit_one(
+							&BlockId::hash(hash),
+							TransactionSource::Local,
+							self.convert_transaction.convert_transaction(transaction.clone()),
+						)
+						.compat()
+						.map(move |_| {
+							if let Some(pending) = pending {
+								if let Ok(locked) = &mut pending.lock() {
+									locked.insert(
+										transaction_hash,
+										PendingTransaction::new(
+											transaction_build(transaction, None, None),
+											UniqueSaturatedInto::<u64>::unique_saturated_into(
+												number
+											)
+										)
+									);
+								}
+							}
+							transaction_hash
+						})
+						.map_err(|err| internal_err(format!("submit transaction to pool failed: {:?}", err)))
 				)
-				.compat()
-				.map(move |_| {
-					if let Some(pending) = pending {
-						if let Ok(locked) = &mut pending.lock() {
-							locked.insert(
-								transaction_hash,
-								PendingTransaction::new(
-									transaction_build(transaction, None, None),
-									UniqueSaturatedInto::<u64>::unique_saturated_into(
-										number
-									)
-								)
-							);
-						}
-					}
-					transaction_hash
-				})
-				.map_err(|err| internal_err(format!("submit transaction to pool failed: {:?}", err)))
-		)
+			},
+			_ => Box::new(futures::future::ok(transaction_hash).compat()),
+		}
 	}
 
 	fn send_raw_transaction(&self, bytes: Bytes) -> BoxFuture<H256> {
@@ -808,33 +825,45 @@ impl<B, C, P, CT, BE, H: ExHashT> EthApiT for EthApi<B, C, P, CT, BE, H> where
 		);
 		let hash = self.client.info().best_hash;
 		let number = self.client.info().best_number;
-		let pending = self.pending_transactions.clone();
-		Box::new(
-			self.pool
-				.submit_one(
-					&BlockId::hash(hash),
-					TransactionSource::Local,
-					self.convert_transaction.convert_transaction(transaction.clone()),
+
+		let uxt = self
+			.convert_transaction
+			.convert_transaction(transaction.clone());
+		let (uxt_hash, _bytes) = self.graph.validated_pool().api().hash_and_length(&uxt);
+		let check_is_known = self.graph.validated_pool().check_is_known(&uxt_hash, false);
+
+		match check_is_known {
+			Ok(_) => {
+				let pending = self.pending_transactions.clone();
+				Box::new(
+					self.pool
+						.submit_one(
+							&BlockId::hash(hash),
+							TransactionSource::Local,
+							self.convert_transaction.convert_transaction(transaction.clone()),
+						)
+						.compat()
+						.map(move |_| {
+							if let Some(pending) = pending {
+								if let Ok(locked) = &mut pending.lock() {
+									locked.insert(
+										transaction_hash,
+										PendingTransaction::new(
+											transaction_build(transaction, None, None),
+											UniqueSaturatedInto::<u64>::unique_saturated_into(
+												number
+											)
+										)
+									);
+								}
+							}
+							transaction_hash
+						})
+						.map_err(|err| internal_err(format!("submit transaction to pool failed: {:?}", err)))
 				)
-				.compat()
-				.map(move |_| {
-					if let Some(pending) = pending {
-						if let Ok(locked) = &mut pending.lock() {
-							locked.insert(
-								transaction_hash,
-								PendingTransaction::new(
-									transaction_build(transaction, None, None),
-									UniqueSaturatedInto::<u64>::unique_saturated_into(
-										number
-									)
-								)
-							);
-						}
-					}
-					transaction_hash
-				})
-				.map_err(|err| internal_err(format!("submit transaction to pool failed: {:?}", err)))
-		)
+			},
+			_ => Box::new(futures::future::ok(transaction_hash).compat()),
+		}
 	}
 
 	fn call(&self, request: CallRequest, _: Option<BlockNumber>) -> Result<Bytes> {

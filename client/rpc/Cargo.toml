@@ -23,6 +23,7 @@ sp-io = { git = "https://github.com/paritytech/substrate.git", branch = "frontie
 sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
 sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
+sc-transaction-graph = { git = "https://github.com/paritytech/substrate", branch = "frontier" }
 sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
 sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "frontier" }
