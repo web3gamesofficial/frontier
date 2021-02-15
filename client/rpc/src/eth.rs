@@ -940,7 +940,12 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 				nonce
 			} = request;
 
-			let gas_limit = gas.unwrap_or(U256::max_value()); // TODO: set a limit
+			// TODO: this value works around a bug in evm's gas estimation, see:
+			// https://github.com/rust-blockchain/evm/issues/8
+			let block_gas_limit: U256 = self.client.runtime_api()
+				.current_block_gas_limit(&BlockId::Hash(hash))
+				.map_err(|err| internal_err(format!("runtime error: {:?}", err)))?;
+			let gas_limit = gas.unwrap_or(block_gas_limit);
 			let data = data.map(|d| d.0).unwrap_or_default();
 
 			let used_gas = match to {
