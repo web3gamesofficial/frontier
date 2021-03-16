@@ -143,10 +143,14 @@ impl SubscriptionResult {
 	}
 	pub fn logs(
 		&self,
-		block: ethereum::Block,
+		block_input: Option<ethereum::Block>,
 		receipts: Vec<ethereum::Receipt>,
 		params: &FilteredParams
 	) -> Vec<Log> {
+		if block_input.is_none() {
+			return Vec::new();
+		}
+		let block = block_input.unwrap();
 		let block_hash = Some(H256::from_slice(
 			Keccak256::digest(&rlp::encode(
 				&block.header
@@ -257,6 +261,8 @@ impl<B: BlockT, P, C, BE, H: ExHashT> EthPubSubApiT for EthPubSubApi<B, P, C, BE
 		let network = self.network.clone();
 		match kind {
 			Kind::Logs => {
+				// NOTE: this conflicted when trying to cherry-pick 45aeab7. our resolution at the
+				// time is to ignore the changes in the cherry-pick. revisit as necessary.
 				self.subscriptions.add(subscriber, |sink| {
 					let stream = client.import_notification_stream()
 					.filter_map(move |notification| {

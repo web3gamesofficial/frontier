@@ -18,7 +18,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use sp_core::{H160, H256, U256};
-use ethereum::{Log, Block as EthereumBlock};
+use ethereum::Log;
 use ethereum_types::Bloom;
 use codec::{Encode, Decode};
 use sp_std::vec::Vec;
@@ -63,7 +63,7 @@ sp_api::decl_runtime_apis! {
 		fn author() -> H160;
 		/// For a given account address and index, returns pallet_evm::AccountStorages.
 		fn storage_at(address: H160, index: U256) -> H256;
-		/// Returns a frame_ethereum::call response. If `estimate` is true,
+		/// Returns a frame_ethereum::call response.
 		fn call(
 			from: H160,
 			to: H160,
