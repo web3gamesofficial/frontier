@@ -33,7 +33,6 @@ use sc_client_api::{client::BlockchainEvents, backend::{StorageProvider, Backend
 use sha3::{Keccak256, Digest};
 use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_storage::StorageKey;
-use codec::Decode;
 use sp_io::hashing::{twox_128, blake2_128};
 use sc_network::{NetworkService, ExHashT};
 use fc_rpc_core::{
@@ -48,7 +47,6 @@ use fp_rpc::{EthereumRuntimeRPCApi, ConvertTransaction, TransactionStatus};
 use fp_storage::PALLET_ETHEREUM_SCHEMA;
 use sc_transaction_graph::{ChainApi, Pool};
 use crate::{internal_err, error_on_execution_failure, EthSigner, public_key};
-use sp_storage::StorageKey;
 
 pub use fc_rpc_core::{EthApiServer, NetApiServer, Web3ApiServer, EthFilterApiServer};
 use codec::{self, Encode, Decode};
