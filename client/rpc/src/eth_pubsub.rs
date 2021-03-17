@@ -284,7 +284,7 @@ impl<B: BlockT, P, C, BE, H: ExHashT> EthPubSubApiT for EthPubSubApi<B, P, C, BE
 					.flat_map(move |(block, receipts)| {
 						futures::stream::iter(
 							SubscriptionResult::new()
-								.logs(block, receipts, &filtered_params)
+								.logs(Some(block), receipts, &filtered_params)
 						)
 					})
 					.map(|x| {
