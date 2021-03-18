@@ -1400,14 +1400,14 @@ impl<B, C> Web3ApiT for Web3Api<B, C> where
 	}
 }
 
-pub struct EthFilterApi<B, C> {
+pub struct EthFilterApi<B, C, BE> {
 	client: Arc<C>,
 	filter_pool: FilterPool,
 	max_stored_filters: usize,
-	_marker: PhantomData<B>,
+	_marker: PhantomData<(B, BE)>,
 }
 
-impl<B, C> EthFilterApi<B, C> {
+impl<B, C, BE> EthFilterApi<B, C, BE> {
 	pub fn new(
 		client: Arc<C>,
 		filter_pool: FilterPool,
@@ -1422,9 +1422,10 @@ impl<B, C> EthFilterApi<B, C> {
 	}
 }
 
-impl<B, C> EthFilterApi<B, C> where
-	C: ProvideRuntimeApi<B> + AuxStore,
-	C::Api: EthereumRuntimeRPCApi<B>,
+impl<B, C, BE> EthFilterApi<B, C, BE> where
+	C: StorageProvider<B, BE> + AuxStore,
+	BE: Backend<B> + 'static,
+	BE::State: StateBackend<BlakeTwo256>,
 	C: HeaderBackend<B> + HeaderMetadata<B, Error=BlockChainError> + 'static,
 	C: Send + Sync + 'static,
 	B: BlockT<Hash=H256> + Send + Sync + 'static,
@@ -1460,11 +1461,42 @@ impl<B, C> EthFilterApi<B, C> where
 		};
 		response
 	}
+
+	fn current_block(&self, id: &BlockId<B>) -> Option<ethereum::Block> {
+		self.query_storage::<ethereum::Block>(
+			id,
+			&StorageKey(
+				storage_prefix_build(b"Ethereum", b"CurrentBlock")
+			)
+		)
+	}
+
+	fn current_statuses(&self, id: &BlockId<B>) -> Option<Vec<TransactionStatus>> {
+		self.query_storage::<Vec<TransactionStatus>>(
+			id,
+			&StorageKey(
+				storage_prefix_build(b"Ethereum", b"CurrentTransactionStatuses")
+			)
+		)
+	}
+
+	fn query_storage<T: Decode>(&self, id: &BlockId<B>, key: &StorageKey) -> Option<T> {
+		if let Ok(Some(data)) = self.client.storage(
+			id,
+			key
+		) {
+			if let Ok(result) = Decode::decode(&mut &data.0[..]) {
+				return Some(result);
+			}
+		}
+		None
+	}
 }
 
-impl<B, C> EthFilterApiT for EthFilterApi<B, C> where
-	C: ProvideRuntimeApi<B> + AuxStore,
-	C::Api: EthereumRuntimeRPCApi<B>,
+impl<B, C, BE> EthFilterApiT for EthFilterApi<B, C, BE> where
+	C: StorageProvider<B, BE> + AuxStore,
+	BE: Backend<B> + 'static,
+	BE::State: StateBackend<BlakeTwo256>,
 	C: HeaderBackend<B> + HeaderMetadata<B, Error=BlockChainError> + 'static,
 	C: Send + Sync + 'static,
 	B: BlockT<Hash=H256> + Send + Sync + 'static,
@@ -1499,11 +1531,8 @@ impl<B, C> EthFilterApiT for EthFilterApi<B, C> where
 						let mut ethereum_hashes: Vec<H256> = Vec::new();
 						for n in last..next {
 							let id = BlockId::Number(n.unique_saturated_into());
-							let block = self.client.runtime_api()
-								.current_block(&id)
-								.map_err(|err| internal_err(
-									format!("fetch runtime block failed: {:?}", err)
-								))?;
+
+							let block: Option<ethereum::Block> = self.current_block(&id);
 							if let Some(block) = block {
 								ethereum_hashes.push(block.header.hash())
 							}
@@ -1551,12 +1580,8 @@ impl<B, C> EthFilterApiT for EthFilterApi<B, C> where
 						let mut blocks_and_statuses = Vec::new();
 						while current_number >= from_number {
 							let id = BlockId::Number(current_number);
-
-							let (block, _, statuses) = self.client.runtime_api()
-								.current_all(&id)
-								.map_err(|err| internal_err(
-									format!("fetch runtime account basic failed: {:?}", err)
-								))?;
+							let block: Option<ethereum::Block> = self.current_block(&id);
+							let statuses: Option<Vec<TransactionStatus>> = self.current_statuses(&id);
 
 							if let (Some(block), Some(statuses)) = (block, statuses) {
 								blocks_and_statuses.push((block, statuses));
@@ -1631,12 +1656,8 @@ impl<B, C> EthFilterApiT for EthFilterApi<B, C> where
 						let mut blocks_and_statuses = Vec::new();
 						while current_number >= from_number {
 							let id = BlockId::Number(current_number);
-
-							let (block, _, statuses) = self.client.runtime_api()
-								.current_all(&id)
-								.map_err(|err| internal_err(
-									format!("fetch runtime account basic failed: {:?}", err)
-								))?;
+							let block: Option<ethereum::Block> = self.current_block(&id);
+							let statuses: Option<Vec<TransactionStatus>> = self.current_statuses(&id);
 
 							if let (Some(block), Some(statuses)) = (block, statuses) {
 								blocks_and_statuses.push((block, statuses));
