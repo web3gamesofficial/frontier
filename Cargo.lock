@@ -5520,7 +5520,6 @@ dependencies = [
  "sp-inherents",
  "sp-runtime",
  "sp-state-machine",
- "sp-timestamp",
  "sp-trie",
  "thiserror",
 ]
@@ -5760,7 +5759,6 @@ dependencies = [
  "sc-network",
  "sp-runtime",
  "substrate-prometheus-endpoint",
- "tracing",
  "wasm-timer",
 ]
 
@@ -6568,7 +6566,6 @@ dependencies = [
  "parity-scale-codec",
  "sp-api",
  "sp-application-crypto",
- "sp-consensus",
  "sp-consensus-slots",
  "sp-inherents",
  "sp-runtime",
