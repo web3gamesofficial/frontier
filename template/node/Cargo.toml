@@ -7,7 +7,7 @@ edition = "2018"
 license = "Unlicense"
 build = "build.rs"
 homepage = "https://substrate.dev"
-repository = "https://github.com/paritytech/substrate/"
+repository = "https://github.com/purestake/substrate/"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -19,36 +19,36 @@ structopt = "0.3.8"
 jsonrpc-core = "15.0.0"
 jsonrpc-pubsub = "15.0.0"
 
-sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-substrate-frame-rpc-system = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-consensus-aura = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-consensus-aura = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-consensus-manual-seal = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sp-api = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-blockchain = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-rpc-api = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-rpc = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+substrate-frame-rpc-system = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+pallet-transaction-payment-rpc = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-cli = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-core = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-executor = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-service = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-inherents = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-transaction-pool = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-transaction-pool = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-network = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-consensus-aura = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-consensus-aura = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-consensus-manual-seal = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-consensus = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-consensus = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-timestamp = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
 pallet-evm = { path = "../../frame/evm" }
 pallet-ethereum = { path = "../../frame/ethereum" }
-sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-telemetry = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-transaction-graph = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sc-finality-grandpa = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-finality-grandpa = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-client-api = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-runtime = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-basic-authorship = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sp-block-builder = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-telemetry = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
+sc-transaction-graph = { git = "https://github.com/purestake/substrate", branch = "moonbeam-v0.7" }
 
 fc-consensus = { path = "../../client/consensus" }
 fp-consensus = { path = "../../primitives/consensus" }
@@ -60,7 +60,7 @@ fc-db = { path = "../../client/db" }
 fc-mapping-sync = { path = "../../client/mapping-sync" }
 
 [build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+substrate-build-script-utils = { git = "https://github.com/purestake/substrate.git", branch = "moonbeam-v0.7" }
 
 [features]
 default = ["aura"]
