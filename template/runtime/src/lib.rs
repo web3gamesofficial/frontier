@@ -484,20 +484,6 @@ impl_runtime_apis! {
 			<Runtime as pallet_evm::Config>::FeeCalculator::min_gas_price()
 		}
 
-		fn account_code_at(address: H160) -> Vec<u8> {
-			EVM::account_codes(address)
-		}
-
-		fn author() -> H160 {
-			<pallet_ethereum::Module<Runtime>>::find_author()
-		}
-
-		fn storage_at(address: H160, index: U256) -> H256 {
-			let mut tmp = [0u8; 32];
-			index.to_big_endian(&mut tmp);
-			EVM::account_storages(address, H256::from_slice(&tmp[..]))
-		}
-
 		fn call(
 			from: H160,
 			to: H160,

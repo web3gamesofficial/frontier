@@ -481,17 +481,25 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn author(&self) -> Result<H160> {
-		let block = BlockId::Hash(self.client.info().best_hash);
-		let schema = self.onchain_storage_schema(block);
+		let block_id = BlockId::Hash(self.client.info().best_hash);
+		let schema = self.onchain_storage_schema(block_id);
 
-		Ok(
-			self.overrides
-			.get(&schema)
-			.unwrap_or(&self.fallback)
-			.current_block(&block)
-			.ok_or(internal_err("fetching author through override failed"))?
-			.header.beneficiary
-		)
+		let block: Option<ethereum::Block> = self.current_block(&BlockId::Hash(
+			self.client.info().best_hash
+		));
+
+		return if let Some(block) = block {
+			Ok(
+				self.overrides
+				.get(&schema)
+				.unwrap_or(&self.fallback)
+				.current_block(&block_id)
+				.ok_or(internal_err("fetching author through override failed"))?
+				.header.beneficiary
+			)
+		} else {
+			Err(internal_err("Failed to retrieve block."))
+		}
 	}
 
 	fn is_mining(&self) -> Result<bool> {
