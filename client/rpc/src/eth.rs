@@ -1341,8 +1341,8 @@ impl<B: BlockT, BE, C, H: ExHashT> NetApiT for NetApi<B, BE, C, H> where
 		Ok(true)
 	}
 
-	fn peer_count(&self) -> Result<u32> {
-		Ok(self.network.num_connected() as u32)
+	fn peer_count(&self) -> Result<String> {
+		Ok(format!("0x{:x}", self.network.num_connected()))
 	}
 
 	fn version(&self) -> Result<String> {
