@@ -1347,22 +1347,8 @@ impl<B: BlockT, BE, C, H: ExHashT> NetApiT for NetApi<B, BE, C, H> where
 
 	fn version(&self) -> Result<String> {
 		let hash = self.client.info().best_hash;
-		let mut chain_id: Option<u64> = None;
-
-		if let Ok(Some(data)) = self.client.storage(
-			&BlockId::Hash(hash),
-			&StorageKey(
-				storage_prefix_build(b"EVM", b"ChainId")
-			)
-		) {
-			chain_id = Decode::decode(&mut &data.0[..]).unwrap_or_else(|_| None);
-		}
-
-		return if let Some(chain_id) = chain_id {
-			Ok(chain_id.to_string())
-		} else {
-			Err(internal_err("Failed to retrieve chain id."))
-		}
+		Ok(self.client.runtime_api().chain_id(&BlockId::Hash(hash))
+			.map_err(|err| internal_err(format!("Failed to retrieve chain id: {:?}", err)))?.to_string())
 	}
 }
 
