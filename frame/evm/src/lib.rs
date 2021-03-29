@@ -281,7 +281,7 @@ pub struct GenesisAccount {
 }
 
 decl_storage! {
-	trait Store for Module<T: Config> as EVM {
+	trait Store for Pallet<T: Config> as EVM {
 		pub AccountCodes get(fn account_codes): map hasher(blake2_128_concat) H160 => Vec<u8>;
 		pub AccountStorages get(fn account_storages):
 			double_map hasher(blake2_128_concat) H160, hasher(blake2_128_concat) H256 => H256;
@@ -296,7 +296,7 @@ decl_storage! {
 				// ASSUME: in one single EVM transaction, the nonce will not increase more than
 				// `u128::max_value()`.
 				for _ in 0..account.nonce.low_u128() {
-					frame_system::Module::<T>::inc_account_nonce(&account_id);
+					frame_system::Pallet::<T>::inc_account_nonce(&account_id);
 				}
 
 				T::Currency::deposit_creating(
@@ -337,7 +337,7 @@ decl_event! {
 }
 
 decl_error! {
-	pub enum Error for Module<T: Config> {
+	pub enum Error for Pallet<T: Config> {
 		/// Not enough balance to perform action
 		BalanceLow,
 		/// Calculating total fee overflowed
@@ -400,10 +400,10 @@ decl_module! {
 
 			match info.exit_reason {
 				ExitReason::Succeed(_) => {
-					Module::<T>::deposit_event(Event::<T>::Executed(target));
+					Pallet::<T>::deposit_event(Event::<T>::Executed(target));
 				},
 				_ => {
-					Module::<T>::deposit_event(Event::<T>::ExecutedFailed(target));
+					Pallet::<T>::deposit_event(Event::<T>::ExecutedFailed(target));
 				},
 			};
 
@@ -443,14 +443,14 @@ decl_module! {
 					value: create_address,
 					..
 				} => {
-					Module::<T>::deposit_event(Event::<T>::Created(create_address));
+					Pallet::<T>::deposit_event(Event::<T>::Created(create_address));
 				},
 				CreateInfo {
 					exit_reason: _,
 					value: create_address,
 					..
 				} => {
-					Module::<T>::deposit_event(Event::<T>::CreatedFailed(create_address));
+					Pallet::<T>::deposit_event(Event::<T>::CreatedFailed(create_address));
 				},
 			}
 
@@ -491,14 +491,14 @@ decl_module! {
 					value: create_address,
 					..
 				} => {
-					Module::<T>::deposit_event(Event::<T>::Created(create_address));
+					Pallet::<T>::deposit_event(Event::<T>::Created(create_address));
 				},
 				CreateInfo {
 					exit_reason: _,
 					value: create_address,
 					..
 				} => {
-					Module::<T>::deposit_event(Event::<T>::CreatedFailed(create_address));
+					Pallet::<T>::deposit_event(Event::<T>::CreatedFailed(create_address));
 				},
 			}
 
@@ -510,7 +510,7 @@ decl_module! {
 	}
 }
 
-impl<T: Config> Module<T> {
+impl<T: Config> Pallet<T> {
 	/// Check whether an account is empty.
 	pub fn is_account_empty(address: &H160) -> bool {
 		let account = Self::account_basic(address);
@@ -532,7 +532,7 @@ impl<T: Config> Module<T> {
 	pub fn remove_account(address: &H160) {
 		if AccountCodes::contains_key(address) {
 			let account_id = T::AddressMapping::into_account_id(*address);
-			let _ = frame_system::Module::<T>::dec_consumers(&account_id);
+			let _ = frame_system::Pallet::<T>::dec_consumers(&account_id);
 		}
 
 		AccountCodes::remove(address);
@@ -547,7 +547,7 @@ impl<T: Config> Module<T> {
 
 		if !AccountCodes::contains_key(&address) {
 			let account_id = T::AddressMapping::into_account_id(address);
-			let _ = frame_system::Module::<T>::inc_consumers(&account_id);
+			let _ = frame_system::Pallet::<T>::inc_consumers(&account_id);
 		}
 
 		AccountCodes::insert(address, code);
@@ -557,7 +557,7 @@ impl<T: Config> Module<T> {
 	pub fn account_basic(address: &H160) -> Account {
 		let account_id = T::AddressMapping::into_account_id(*address);
 
-		let nonce = frame_system::Module::<T>::account_nonce(&account_id);
+		let nonce = frame_system::Pallet::<T>::account_nonce(&account_id);
 		let balance = T::Currency::free_balance(&account_id);
 
 		Account {
