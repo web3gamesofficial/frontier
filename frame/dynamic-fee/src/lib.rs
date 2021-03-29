@@ -115,7 +115,7 @@ impl ProvideInherentData for InherentDataProvider {
 	}
 }
 
-impl<T: Config> ProvideInherent for Module<T> {
+impl<T: Config> ProvideInherent for Pallet<T> {
 	type Call = Call<T>;
 	type Error = InherentError;
 	const INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
