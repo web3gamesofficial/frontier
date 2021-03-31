@@ -59,7 +59,7 @@ pub mod runner;
 pub use crate::runner::Runner;
 pub use fp_evm::{
 	Account, Log, Vicinity, ExecutionInfo, CallInfo, CreateInfo, Precompile,
-	PrecompileSet, LinearCostPrecompile,
+	PrecompileSet,
 };
 pub use evm::{ExitReason, ExitSucceed, ExitError, ExitRevert, ExitFatal};
 
