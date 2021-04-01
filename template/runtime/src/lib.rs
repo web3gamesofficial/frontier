@@ -578,7 +578,7 @@ impl_runtime_apis! {
 		}
 
 		fn current_block_gas_limit() -> U256 {
-			<Runtime as pallet_ethereum::Config>::BlockGasLimit::get()
+			BlockGasLimit::get()
 		}
 	}
 
