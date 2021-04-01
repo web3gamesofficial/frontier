@@ -21,7 +21,7 @@ use ethereum::{
 	Block as EthereumBlock, Transaction as EthereumTransaction
 };
 use ethereum_types::{H160, H256, H64, U256, U64, H512};
-use jsonrpc_core::{BoxFuture, Result, futures::future::{self, Future}};
+use jsonrpc_core::{BoxFuture, Result, ErrorCode, futures::future::{self, Future}};
 use futures::{StreamExt, future::TryFutureExt};
 use sp_runtime::{
 	traits::{Block as BlockT, UniqueSaturatedInto, Zero, One, Saturating, BlakeTwo256},
@@ -46,10 +46,10 @@ use fc_rpc_core::types::{
 use fp_rpc::{EthereumRuntimeRPCApi, ConvertTransaction, TransactionStatus};
 use fp_storage::PALLET_ETHEREUM_SCHEMA;
 use sc_transaction_graph::{ChainApi, Pool};
-use crate::{internal_err, error_on_execution_failure, EthSigner, public_key};
+use crate::{frontier_backend_client, internal_err, error_on_execution_failure, EthSigner, public_key};
 
 pub use fc_rpc_core::{EthApiServer, NetApiServer, Web3ApiServer, EthFilterApiServer};
-use codec::{self, Encode, Decode};
+use codec::{self, Encode};
 use pallet_ethereum::EthereumStorageSchema;
 use crate::overrides::{StorageOverride, RuntimeApiStorageOverride};
 
@@ -495,8 +495,8 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn author(&self) -> Result<H160> {
-		let block_id = BlockId::Hash(self.client.info().best_hash);
-		let schema = self.onchain_storage_schema(block_id);
+		let block = BlockId::Hash(self.client.info().best_hash);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), block);
 
 		let block: Option<ethereum::Block> = self.current_block(&BlockId::Hash(
 			self.client.info().best_hash
@@ -507,7 +507,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 				self.overrides
 				.get(&schema)
 				.unwrap_or(&self.fallback)
-				.current_block(&block_id)
+				.current_block(&block)
 				.ok_or(internal_err("fetching author through override failed"))?
 				.header.beneficiary
 			)
@@ -551,7 +551,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn balance(&self, address: H160, number: Option<BlockNumber>) -> Result<U256> {
-		if let Ok(Some(id)) = self.native_block_id(number) {
+		if let Ok(Some(id)) = frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), number) {
 			return Ok(
 				self.client
 					.runtime_api()
@@ -564,8 +564,8 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn storage_at(&self, address: H160, index: U256, number: Option<BlockNumber>) -> Result<H256> {
-		if let Ok(Some(id)) = self.native_block_id(number) {
-			let schema = self.onchain_storage_schema(id);
+		if let Ok(Some(id)) = frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), number) {
+			let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 			return Ok(
 				self.overrides
 					.get(&schema)
@@ -579,13 +579,13 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn block_by_hash(&self, hash: H256, full: bool) -> Result<Option<RichBlock>> {
-		let id = match self.load_hash(hash)
+		let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))?
 		{
 			Some(hash) => hash,
 			_ => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -607,11 +607,11 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn block_by_number(&self, number: BlockNumber, full: bool) -> Result<Option<RichBlock>> {
-		let id = match self.native_block_id(Some(number))? {
+		let id = match frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), Some(number))? {
 			Some(id) => id,
 			None => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -659,7 +659,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 			return Ok(current_nonce);
 		}
 
-		let id = match self.native_block_id(number)? {
+		let id = match frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), number)? {
 			Some(id) => id,
 			None => return Ok(U256::zero()),
 		};
@@ -673,13 +673,13 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn block_transaction_count_by_hash(&self, hash: H256) -> Result<Option<U256>> {
-		let id = match self.load_hash(hash)
+		let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))?
 		{
 			Some(hash) => hash,
 			_ => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let block = self.overrides.get(&schema).unwrap_or(&self.fallback).current_block(&id);
 
 		match block {
@@ -689,11 +689,11 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn block_transaction_count_by_number(&self, number: BlockNumber) -> Result<Option<U256>> {
-		let id = match self.native_block_id(Some(number))? {
+		let id = match frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), Some(number))? {
 			Some(id) => id,
 			None => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let block = self.overrides.get(&schema).unwrap_or(&self.fallback).current_block(&id);
 
 		match block {
@@ -711,8 +711,8 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn code_at(&self, address: H160, number: Option<BlockNumber>) -> Result<Bytes> {
-		if let Ok(Some(id)) = self.native_block_id(number) {
-			let schema = self.onchain_storage_schema(id);
+		if let Ok(Some(id)) = frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), number) {
+			let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 
 			return Ok(
 				self.overrides
@@ -949,7 +949,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn estimate_gas(&self, request: CallRequest, _: Option<BlockNumber>) -> Result<U256> {
-		let calculate_gas_used = |request| {
+		let calculate_gas_used = |request| -> Result<U256> {
 			let hash = self.client.info().best_hash;
 
 			let CallRequest {
@@ -1042,14 +1042,18 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 						mid = (lower + upper + 1) / 2;
 					}
 
-					// if Err -- we need more gas
-					Err(_) => {
-						lower = mid;
-						mid = (lower + upper + 1) / 2;
-
-						if mid == lower {
-							break;
+					Err(err) => {
+						// if Err == OutofGas or OutofFund, we need more gas
+						if err.code == ErrorCode::ServerError(0) {
+							lower = mid;
+							mid = (lower + upper + 1) / 2;
+							if mid == lower {
+								break;
+							}
 						}
+
+						// Other errors, return directly
+						return Err(err);
 					}
 				}
 			}
@@ -1061,7 +1065,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 
 	fn transaction_by_hash(&self, hash: H256) -> Result<Option<Transaction>> {
 
-		let (hash, index) = match self.load_transactions(hash)
+		let (hash, index) = match frontier_backend_client::load_transactions::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))? {
 			Some((hash, index)) => (hash, index as usize),
 			None => {
@@ -1076,13 +1080,13 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 			},
 		};
 
-		let id = match self.load_hash(hash)
+		let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))?
 		{
 			Some(hash) => hash,
 			_ => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -1105,7 +1109,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 		hash: H256,
 		index: Index,
 	) -> Result<Option<Transaction>> {
-		let id = match self.load_hash(hash)
+		let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))?
 		{
 			Some(hash) => hash,
@@ -1113,7 +1117,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 		};
 		let index = index.value();
 
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -1136,12 +1140,12 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 		number: BlockNumber,
 		index: Index,
 	) -> Result<Option<Transaction>> {
-		let id = match self.native_block_id(Some(number))? {
+		let id = match frontier_backend_client::native_block_id::<B, C>(self.client.as_ref(), self.backend.as_ref(), Some(number))? {
 			Some(id) => id,
 			None => return Ok(None),
 		};
 		let index = index.value();
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -1160,19 +1164,19 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	}
 
 	fn transaction_receipt(&self, hash: H256) -> Result<Option<Receipt>> {
-		let (hash, index) = match self.load_transactions(hash)
+		let (hash, index) = match frontier_backend_client::load_transactions::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))? {
 			Some((hash, index)) => (hash, index as usize),
 			None => return Ok(None),
 		};
 
-		let id = match self.load_hash(hash)
+		let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 			.map_err(|err| internal_err(format!("{:?}", err)))?
 		{
 			Some(hash) => hash,
 			_ => return Ok(None),
 		};
-		let schema = self.onchain_storage_schema(id);
+		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), id);
 		let handler = self.overrides.get(&schema).unwrap_or(&self.fallback);
 
 		let block = handler.current_block(&id);
@@ -1253,7 +1257,7 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 	fn logs(&self, filter: Filter) -> Result<Vec<Log>> {
 		let mut blocks_and_statuses = Vec::new();
 		if let Some(hash) = filter.block_hash.clone() {
-			let id = match self.load_hash(hash)
+			let id = match frontier_backend_client::load_hash::<B, C>(self.client.as_ref(), self.backend.as_ref(), hash)
 				.map_err(|err| internal_err(format!("{:?}", err)))?
 			{
 				Some(hash) => hash,
