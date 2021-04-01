@@ -49,7 +49,7 @@ use sc_transaction_graph::{ChainApi, Pool};
 use crate::{frontier_backend_client, internal_err, error_on_execution_failure, EthSigner, public_key};
 
 pub use fc_rpc_core::{EthApiServer, NetApiServer, Web3ApiServer, EthFilterApiServer};
-use codec::{self, Encode};
+use codec::{self, Encode, Decode};
 use pallet_ethereum::EthereumStorageSchema;
 use crate::overrides::{StorageOverride, RuntimeApiStorageOverride};
 
@@ -498,22 +498,14 @@ impl<B, C, P, CT, BE, H: ExHashT, A> EthApiT for EthApi<B, C, P, CT, BE, H, A> w
 		let block = BlockId::Hash(self.client.info().best_hash);
 		let schema = frontier_backend_client::onchain_storage_schema::<B, C, BE>(self.client.as_ref(), block);
 
-		let block: Option<ethereum::Block> = self.current_block(&BlockId::Hash(
-			self.client.info().best_hash
-		));
-
-		return if let Some(block) = block {
-			Ok(
-				self.overrides
-				.get(&schema)
-				.unwrap_or(&self.fallback)
-				.current_block(&block)
-				.ok_or(internal_err("fetching author through override failed"))?
-				.header.beneficiary
-			)
-		} else {
-			Err(internal_err("Failed to retrieve block."))
-		}
+		Ok(
+			self.overrides
+			.get(&schema)
+			.unwrap_or(&self.fallback)
+			.current_block(&block)
+			.ok_or(internal_err("fetching author through override failed"))?
+			.header.beneficiary
+		)
 	}
 
 	fn is_mining(&self) -> Result<bool> {
