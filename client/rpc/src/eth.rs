@@ -1146,8 +1146,29 @@ where
 	}
 
 	fn estimate_gas(&self, request: CallRequest, _: Option<BlockNumber>) -> Result<U256> {
+		// Define the lower bound of estimate
+		const MIN_GAS_PER_TX: U256 = U256([21_000, 0, 0, 0]);
+
 		// Get best hash (TODO missing support for estimating gas historically)
 		let best_hash = self.client.info().best_hash;
+
+		// For simple transfer to simple account, return MIN_GAS_PER_TX directly
+		let is_simple_transfer = match &request.data {
+			None => true,
+			Some(vec) => vec.0.is_empty(),
+		};
+		if is_simple_transfer {
+			if let Some(to) = request.to {
+				let to_code = self
+					.client
+					.runtime_api()
+					.account_code_at(&BlockId::Hash(best_hash), to)
+					.map_err(|err| internal_err(format!("runtime error: {:?}", err)))?;
+				if to_code.is_empty() {
+					return Ok(MIN_GAS_PER_TX);
+				}
+			}
+		}
 
 		let (gas_price, max_fee_per_gas, max_priority_fee_per_gas) = {
 			let details = fee_details(
@@ -1386,7 +1407,6 @@ where
 		#[cfg(feature = "rpc_binary_search_estimate")]
 		{
 			// Define the lower bound of the binary search
-			const MIN_GAS_PER_TX: U256 = U256([21_000, 0, 0, 0]);
 			let mut lowest = MIN_GAS_PER_TX;
 
 			// Start close to the used gas for faster binary search
@@ -1399,7 +1419,7 @@ where
 					data,
 					exit_reason,
 					used_gas: _,
-				} = executable(request.clone(), highest, api_version)?;
+				} = executable(request.clone(), mid, api_version)?;
 				match exit_reason {
 					ExitReason::Succeed(_) => {
 						highest = mid;
@@ -1645,10 +1665,8 @@ where
 			.current_transaction_statuses(handler, substrate_hash);
 		let receipts = handler.current_receipts(&id);
 
-		let base_fee = handler.base_fee(&id);
-
-		match (block, statuses, receipts, base_fee) {
-			(Some(block), Some(statuses), Some(receipts), Some(base_fee)) => {
+		match (block, statuses, receipts) {
+			(Some(block), Some(statuses), Some(receipts)) => {
 				let block_hash =
 					H256::from_slice(Keccak256::digest(&rlp::encode(&block.header)).as_slice());
 				let receipt = receipts[index].clone();
@@ -1660,7 +1678,9 @@ where
 				let effective_gas_price = match transaction {
 					EthereumTransaction::Legacy(t) => t.gas_price,
 					EthereumTransaction::EIP2930(t) => t.gas_price,
-					EthereumTransaction::EIP1559(t) => base_fee
+					EthereumTransaction::EIP1559(t) => handler
+						.base_fee(&id)
+						.unwrap_or_default()
 						.checked_add(t.max_priority_fee_per_gas)
 						.unwrap_or(U256::max_value()),
 				};
