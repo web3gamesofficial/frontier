@@ -171,14 +171,6 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
-	#[pallet::without_storage_info]
-	pub struct Pallet<T>(PhantomData<T>);
-
-	#[pallet::origin]
-	pub type Origin = RawOrigin;
-
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_timestamp::Config + pallet_evm::Config {
 		/// The overarching event type.
@@ -186,6 +178,14 @@ pub mod pallet {
 		/// How Ethereum state root is calculated.
 		type StateRoot: Get<H256>;
 	}
+
+	#[pallet::pallet]
+	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
+	pub struct Pallet<T>(PhantomData<T>);
+
+	#[pallet::origin]
+	pub type Origin = RawOrigin;
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
@@ -278,13 +278,8 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event {
-		/// An ethereum transaction was successfully executed.
-		Executed {
-			from: H160,
-			to: H160,
-			transaction_hash: H256,
-			exit_reason: ExitReason,
-		},
+		/// An ethereum transaction was successfully executed. [from, to/contract_address, transaction_hash, exit_reason]
+		Executed(H160, H160, H256, ExitReason),
 	}
 
 	#[pallet::error]
@@ -594,12 +589,12 @@ impl<T: Config> Pallet<T> {
 
 		Pending::<T>::append((transaction, status, receipt));
 
-		Self::deposit_event(Event::Executed {
-			from: source,
-			to: dest.unwrap_or_default(),
+		Self::deposit_event(Event::Executed(
+			source,
+			dest.unwrap_or_default(),
 			transaction_hash,
-			exit_reason: reason,
-		});
+			reason,
+		));
 
 		Ok(PostDispatchInfo {
 			actual_weight: Some(T::GasWeightMapping::gas_to_weight(
@@ -873,12 +868,16 @@ impl<T: Config> BlockHashMapping for EthereumBlockHashMapping<T> {
 }
 
 #[repr(u8)]
-enum TransactionValidationError {
+#[derive(num_enum::FromPrimitive, num_enum::IntoPrimitive)]
+pub enum TransactionValidationError {
 	#[allow(dead_code)]
+	#[num_enum(default)]
 	UnknownError,
 	InvalidChainId,
 	InvalidSignature,
-	InvalidGasLimit,
+	GasLimitTooLow,
+	GasLimitTooHigh,
+	InsufficientFundsForTransfer,
 	MaxFeePerGasTooLow,
 }
 
@@ -888,10 +887,10 @@ impl From<InvalidEvmTransactionError> for InvalidTransactionWrapper {
 	fn from(validation_error: InvalidEvmTransactionError) -> Self {
 		match validation_error {
 			InvalidEvmTransactionError::GasLimitTooLow => InvalidTransactionWrapper(
-				InvalidTransaction::Custom(TransactionValidationError::InvalidGasLimit as u8),
+				InvalidTransaction::Custom(TransactionValidationError::GasLimitTooLow as u8),
 			),
 			InvalidEvmTransactionError::GasLimitTooHigh => InvalidTransactionWrapper(
-				InvalidTransaction::Custom(TransactionValidationError::InvalidGasLimit as u8),
+				InvalidTransaction::Custom(TransactionValidationError::GasLimitTooHigh as u8),
 			),
 			InvalidEvmTransactionError::GasPriceTooLow => {
 				InvalidTransactionWrapper(InvalidTransaction::Payment)

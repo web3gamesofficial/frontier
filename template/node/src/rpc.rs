@@ -167,6 +167,7 @@ where
 			// Is authority.
 			is_authority,
 			block_data_cache.clone(),
+			fc_rpc::format::Legacy,
 			fee_history_cache,
 			fee_history_cache_limit,
 		)

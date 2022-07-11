@@ -169,19 +169,24 @@ impl Precompile for Bn128Pairing {
 	fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
 		use bn::{pairing_batch, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 
-		let ret_val = if handle.input().is_empty() {
-			handle.record_cost(Bn128Pairing::BASE_GAS_COST)?;
-			U256::one()
+		let input = handle.input();
+		let target_gas = handle.gas_limit();
+
+		let (ret_val, gas_cost) = if input.is_empty() {
+			(U256::one(), Bn128Pairing::BASE_GAS_COST)
 		} else {
 			// (a, b_a, b_b - each 64-byte affine coordinates)
-			let elements = handle.input().len() / 192;
+			let elements = input.len() / 192;
 
 			let gas_cost: u64 = Bn128Pairing::BASE_GAS_COST
 				+ (elements as u64 * Bn128Pairing::GAS_COST_PER_PAIRING);
-
-			handle.record_cost(gas_cost)?;
-
-			let input = handle.input();
+			if let Some(gas_left) = target_gas {
+				if gas_left < gas_cost {
+					return Err(PrecompileFailure::Error {
+						exit_status: ExitError::OutOfGas,
+					});
+				}
+			}
 
 			let mut vals = Vec::new();
 			for idx in 0..elements {
@@ -263,11 +268,13 @@ impl Precompile for Bn128Pairing {
 			let mul = pairing_batch(&vals);
 
 			if mul == Gt::one() {
-				U256::one()
+				(U256::one(), gas_cost)
 			} else {
-				U256::zero()
+				(U256::zero(), gas_cost)
 			}
 		};
+
+		handle.record_cost(gas_cost)?;
 
 		let mut buf = [0u8; 32];
 		ret_val.to_big_endian(&mut buf);

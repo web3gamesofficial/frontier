@@ -12,9 +12,10 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 ethereum = { version = "0.12.0", features = ["with-codec"] }
-evm = { git = "https://github.com/rust-blockchain/evm", rev = "01bcbd2205a212c34451d3b4fabc962793b057d3" }
+evm = { git = "https://github.com/rust-blockchain/evm", branch = "master" }
 futures = "0.3.21"
 hex = "0.4.3"
+hex-literal = "0.3.4"
 log = "0.4.17"
 lru = "0.7.7"
 prometheus = { version = "0.13.1", default-features = false }
@@ -49,6 +50,7 @@ fc-db = { version = "2.0.0-dev", path = "../db" }
 fc-rpc-core = { version = "1.1.0-dev", path = "../rpc-core" }
 fp-rpc = { version = "3.0.0-dev", path = "../../primitives/rpc" }
 fp-storage = { version = "2.0.0-dev", path = "../../primitives/storage" }
+pallet-ethereum = { version = "4.0.0-dev", path = "../../frame/ethereum" }
 
 [dev-dependencies]
 tempfile = "3.3.0"

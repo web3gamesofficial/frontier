@@ -38,9 +38,9 @@ describeWithFrontier("Frontier RPC (Contract Methods)", (context) => {
 		const latestBlock = await context.web3.eth.getBlock("latest");
 		expect(latestBlock.transactions.length).to.equal(1);
 
-		const txHash = latestBlock.transactions[0];
-		const tx = await context.web3.eth.getTransaction(txHash);
-		expect(tx.hash).to.equal(txHash);
+		const tx_hash = latestBlock.transactions[0];
+		const tx = await context.web3.eth.getTransaction(tx_hash);
+		expect(tx.hash).to.equal(tx_hash);
 	});
 
 	it("should return contract method result", async function () {
