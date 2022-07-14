@@ -281,7 +281,7 @@ where
 
 	pub async fn estimate_gas(
 		&self,
-		mut request: CallRequest,
+		request: CallRequest,
 		_: Option<BlockNumber>,
 	) -> Result<U256> {
 		let client = Arc::clone(&self.client);
