@@ -174,6 +174,7 @@ impl Precompile for Modexp {
 			// do our gas accounting
 			let gas_cost =
 				calculate_gas_cost(base_len as u64, exp_len as u64, mod_len as u64, &exponent);
+
 			handle.record_cost(gas_cost)?;
 			let input = handle.input();
 
@@ -186,7 +187,6 @@ impl Precompile for Modexp {
 				base.modpow(&exponent, &modulus)
 			}
 		};
-
 
 		// write output to given memory, left padded and same length as the modulus.
 		let bytes = r.to_bytes_be();

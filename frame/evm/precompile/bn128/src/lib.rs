@@ -178,6 +178,7 @@ impl Precompile for Bn128Pairing {
 
 			let gas_cost: u64 = Bn128Pairing::BASE_GAS_COST
 				+ (elements as u64 * Bn128Pairing::GAS_COST_PER_PAIRING);
+
 			handle.record_cost(gas_cost)?;
 
 			let input = handle.input();

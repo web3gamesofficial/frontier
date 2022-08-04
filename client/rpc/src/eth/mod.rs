@@ -22,7 +22,6 @@ mod client;
 mod execute;
 mod fee;
 mod filter;
-pub mod format;
 mod mining;
 mod state;
 mod submit;
@@ -55,11 +54,10 @@ use crate::{internal_err, overrides::OverrideHandle, public_key, signer::EthSign
 pub use self::{
 	cache::{EthBlockDataCacheTask, EthTask},
 	filter::EthFilter,
-	format::Formatter,
 };
 
 /// Eth API implementation.
-pub struct Eth<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi, F> {
+pub struct Eth<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi> {
 	pool: Arc<P>,
 	graph: Arc<Pool<A>>,
 	client: Arc<C>,
@@ -72,10 +70,10 @@ pub struct Eth<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi, F> {
 	block_data_cache: Arc<EthBlockDataCacheTask<B>>,
 	fee_history_cache: FeeHistoryCache,
 	fee_history_cache_limit: FeeHistoryCacheLimit,
-	_marker: PhantomData<(B, BE, F)>,
+	_marker: PhantomData<(B, BE)>,
 }
 
-impl<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi, F> Eth<B, C, P, CT, BE, H, A, F> {
+impl<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi> Eth<B, C, P, CT, BE, H, A> {
 	pub fn new(
 		client: Arc<C>,
 		pool: Arc<P>,
@@ -87,7 +85,6 @@ impl<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi, F> Eth<B, C, P, CT, BE, H
 		backend: Arc<fc_db::Backend<B>>,
 		is_authority: bool,
 		block_data_cache: Arc<EthBlockDataCacheTask<B>>,
-		_formatter: F,
 		fee_history_cache: FeeHistoryCache,
 		fee_history_cache_limit: FeeHistoryCacheLimit,
 	) -> Self {
@@ -110,7 +107,7 @@ impl<B: BlockT, C, P, CT, BE, H: ExHashT, A: ChainApi, F> Eth<B, C, P, CT, BE, H
 }
 
 #[async_trait]
-impl<B, C, P, CT, BE, H: ExHashT, A, F> EthApiServer for Eth<B, C, P, CT, BE, H, A, F>
+impl<B, C, P, CT, BE, H: ExHashT, A> EthApiServer for Eth<B, C, P, CT, BE, H, A>
 where
 	B: BlockT<Hash = H256> + Send + Sync + 'static,
 	C: ProvideRuntimeApi<B> + StorageProvider<B, BE>,
@@ -121,7 +118,6 @@ where
 	BE: Backend<B> + 'static,
 	BE::State: StateBackend<BlakeTwo256>,
 	A: ChainApi<Block = B> + 'static,
-	F: Formatter + Send + Sync + 'static,
 {
 	// ########################################################################
 	// Client

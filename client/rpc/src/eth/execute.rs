@@ -44,7 +44,7 @@ use crate::{
 /// Default JSONRPC error code return by geth
 pub const JSON_RPC_ERROR_DEFAULT: i32 = -32000;
 
-impl<B, C, P, CT, BE, H: ExHashT, A: ChainApi, F> Eth<B, C, P, CT, BE, H, A, F>
+impl<B, C, P, CT, BE, H: ExHashT, A: ChainApi> Eth<B, C, P, CT, BE, H, A>
 where
 	B: BlockT<Hash = H256> + Send + Sync + 'static,
 	C: ProvideRuntimeApi<B> + StorageProvider<B, BE>,
@@ -279,11 +279,7 @@ where
 		}
 	}
 
-	pub async fn estimate_gas(
-		&self,
-		request: CallRequest,
-		_: Option<BlockNumber>,
-	) -> Result<U256> {
+	pub async fn estimate_gas(&self, request: CallRequest, _: Option<BlockNumber>) -> Result<U256> {
 		let client = Arc::clone(&self.client);
 		let block_data_cache = Arc::clone(&self.block_data_cache);
 
@@ -622,21 +618,6 @@ where
 
 			// Start close to the used gas for faster binary search
 			let mut mid = std::cmp::min(used_gas * 3, (highest + lowest) / 2);
-
-			// Redirect any call to batch precompile:
-			// force usage of batchAll method for estimation
-			use sp_core::H160;
-			const BATCH_PRECOMPILE_ADDRESS: H160 = H160(hex_literal::hex!(
-				"0000000000000000000000000000000000000808"
-			));
-			const BATCH_PRECOMPILE_BATCH_ALL_SELECTOR: [u8; 4] = hex_literal::hex!("96e292b8");
-			if request.to == Some(BATCH_PRECOMPILE_ADDRESS) {
-				if let Some(ref mut data) = request.data {
-					if data.0.len() >= 4 {
-						data.0[..4].copy_from_slice(&BATCH_PRECOMPILE_BATCH_ALL_SELECTOR);
-					}
-				}
-			}
 
 			// Execute the binary search and hone in on an executable gas limit.
 			let mut previous_highest = highest;
